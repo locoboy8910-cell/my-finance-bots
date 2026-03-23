@@ -1,83 +1,48 @@
-import FinanceDataReader as fdr
 import requests
+from bs4 import BeautifulSoup
 import time
 from datetime import datetime
 import schedule
-from bs4 import BeautifulSoup
 
-# [공통 설정]
+# [설정]
+TOKEN = "8762651451:AAEVxzq-EYFgjUYDZ4NbXCapuKiB-tvG9hc"
 CHAT_ID = "7118209547"
-# 1&2번 봇 토큰 (지표/트럼프)
-TOKEN_1 = "8057933847:AAH6NtEwgsfWO5-Cg785dqDVSSMM2Lgitp8"
-# 3번 봇 토큰 (글로벌 시황)
-TOKEN_3 = "8762651451:AAEVxzq-EYFgjUYDZ4NbXCapuKiB-tvG9hc"
-
-def send_telegram(token, message):
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    params = {"chat_id": CHAT_ID, "text": message}
-    try: requests.get(url, params=params)
-    except: print("❌ 메시지 전송 실패")
 
 def get_translate(text):
-    if not text: return ""
+    """라이브러리 없이 구글 번역기 사용 (오류 방지)"""
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q={text}"
         res = requests.get(url, timeout=10)
+        # 번역 결과 추출
         return "".join([p[0] for p in res.json()[0] if p and p[0]])
-    except: return text
+    except:
+        return text
 
-# --- 1. 지표 보고 기능 ---
-def report_finance():
-    print(f"🔍 지표 수집 중...")
-    try:
-        usd = fdr.DataReader('USD/KRW').iloc[-1]['Close']
-        tsla = fdr.DataReader('TSLA').iloc[-1]['Close']
-        tsll = fdr.DataReader('TSLL').iloc[-1]['Close']
-        msg = f"⏰ [금융 지표]\n달러/원: {usd:,.2f}원\nTSLA: ${tsla:,.2f}\nTSLL: ${tsll:,.2f}"
-        send_telegram(TOKEN_1, msg)
-    except: print("⚠️ 지표 수집 오류")
-
-# --- 2. 글로벌 시황 (아침 8시) ---
-def report_global_market():
-    print(f"🌎 글로벌 시황 수집 중...")
+def get_google_news():
+    print(f"📡 시황 수집 중...")
     url = "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNR3GRZEdsdVpYUnpLQUFTR2dKSlRpZ0FQAQ?hl=en-US&gl=US&ceid=US:en"
     try:
         res = requests.get(url, timeout=10)
         soup = BeautifulSoup(res.content, 'html.parser')
-        items = soup.find_all('item')[:4]
+        items = soup.find_all('item')[:5]
         report = "🌎 [글로벌 경제 핵심 요약]\n━━━━━━━━━━━━\n\n"
         for i, item in enumerate(items, 1):
-            clean_title = item.title.text.split(' - ')[0]
-            report += f"{i}. {get_translate(clean_title)}\n\n"
-        send_telegram(TOKEN_3, report)
-    except: print("⚠️ 시황 수집 오류")
+            title = item.title.text.split(' - ')[0]
+            report += f"{i}. {get_translate(title)}\n\n"
+        return report
+    except Exception as e:
+        return f"⚠️ 수집 오류: {e}"
 
-# --- 3. 트럼프 실시간 뉴스 (1분마다) ---
-last_news = ""
-def check_trump_news():
-    global last_news
-    url = "https://search.naver.com/search.naver?where=news&query=트럼프&sort=1"
-    try:
-        res = requests.get(url)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        new_title = soup.select_one('a.news_tit').get_text()
-        if new_title != last_news:
-            send_telegram(TOKEN_1, f"🚨 [속보] 트럼프 뉴스: {new_title}")
-            last_news = new_title
-    except: pass
+def send_morning_report():
+    report = get_google_news()
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    params = {"chat_id": CHAT_ID, "text": report}
+    requests.get(url, params=params)
+    print("✅ 전송 완료")
 
 if __name__ == "__main__":
-    print("🚀 통합 비서 가동 시작!")
-    
-    # 즉시 실행 테스트
-    report_finance()
-    report_global_market()
-
-    # 스케줄 등록
-    schedule.every(2).hours.do(report_finance)    # 2시간마다 지표
-    schedule.every().day.at("08:00").do(report_global_market) # 아침 8시 시황
-    
+    send_morning_report() # 지금 바로 메시지 오는지 확인
+    schedule.every().day.at("08:00").do(send_morning_report)
     while True:
         schedule.run_pending()
-        check_trump_news() # 실시간 뉴스 체크
-        time.sleep(60) # 1분마다 반복
+        time.sleep(60)
