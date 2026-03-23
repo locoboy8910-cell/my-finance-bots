@@ -10,7 +10,7 @@ import os
 
 # [1. Render 포트 체크 통과를 위한 가짜 서버]
 def run_dummy_server():
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 80))
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", port), handler) as httpd:
         print(f"✅ 가짜 서버가 {port}번 포트에서 작동 중입니다.")
