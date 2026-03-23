@@ -1,48 +1,33 @@
-import requests
-from bs4 import BeautifulSoup
+import FinanceDataReader as fdr
 import time
-from datetime import datetime
+import requests
 import schedule
 
 # [설정]
 TOKEN = "8762651451:AAEVxzq-EYFgjUYDZ4NbXCapuKiB-tvG9hc"
 CHAT_ID = "7118209547"
+TARGET = 'TSLA'  # 감시 종목
 
-def get_translate(text):
-    """라이브러리 없이 구글 번역기 사용 (오류 방지)"""
-    try:
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q={text}"
-        res = requests.get(url, timeout=10)
-        # 번역 결과 추출
-        return "".join([p[0] for p in res.json()[0] if p and p[0]])
-    except:
-        return text
-
-def get_google_news():
-    print(f"📡 시황 수집 중...")
-    url = "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNR3GRZEdsdVpYUnpLQUFTR2dKSlRpZ0FQAQ?hl=en-US&gl=US&ceid=US:en"
-    try:
-        res = requests.get(url, timeout=10)
-        soup = BeautifulSoup(res.content, 'html.parser')
-        items = soup.find_all('item')[:5]
-        report = "🌎 [글로벌 경제 핵심 요약]\n━━━━━━━━━━━━\n\n"
-        for i, item in enumerate(items, 1):
-            title = item.title.text.split(' - ')[0]
-            report += f"{i}. {get_translate(title)}\n\n"
-        return report
-    except Exception as e:
-        return f"⚠️ 수집 오류: {e}"
-
-def send_morning_report():
-    report = get_google_news()
+def send_msg(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    params = {"chat_id": CHAT_ID, "text": report}
+    params = {"chat_id": CHAT_ID, "text": text}
     requests.get(url, params=params)
-    print("✅ 전송 완료")
+
+def check_market():
+    try:
+        # 최신 가격 데이터 가져오기
+        df = fdr.DataReader(TARGET).iloc[-1]
+        price = df['Close']
+        msg = f"🔔 [실시간 가격 보고]\n{TARGET}: ${price:,.2f}"
+        send_msg(msg)
+    except Exception as e:
+        print(f"⚠️ 오류 발생: {e}")
 
 if __name__ == "__main__":
-    send_morning_report() # 지금 바로 메시지 오는지 확인
-    schedule.every().day.at("08:00").do(send_morning_report)
+    check_market() # 시작하자마자 한 번 전송 (테스트용)
+    # 3시간마다 보고
+    schedule.every(3).hours.do(check_market)
+    
     while True:
         schedule.run_pending()
         time.sleep(60)
