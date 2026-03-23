@@ -3,10 +3,25 @@ import requests
 import time
 import schedule
 from bs4 import BeautifulSoup
+import http.server
+import socketserver
+import threading
+import os
 
-# [설정]
+# [1. Render 포트 체크 통과를 위한 가짜 서버]
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        print(f"✅ 가짜 서버가 {port}번 포트에서 작동 중입니다.")
+        httpd.serve_forever()
+
+# 배경에서 가짜 서버 실행
+threading.Thread(target=run_dummy_server, daemon=True).start()
+
+# [2. 설정]
 CHAT_ID = "7118209547"
-TOKEN_FINANCE = "8057933847:AAH6NtEwgsfWO5-Cg785dqDVSSMM2Lgitp8" # 모든 알림 통합용
+TOKEN_FINANCE = "8057933847:AAH6NtEwgsfWO5-Cg785dqDVSSMM2Lgitp8"
 
 def send_tg(token, msg):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -14,18 +29,17 @@ def send_tg(token, msg):
         requests.get(url, params={"chat_id": CHAT_ID, "text": msg}, timeout=10)
     except: pass
 
-# 1. 종합 금융 지표 보고 (2시간마다)
+# [3. 종합 금융 지표 보고]
 def report_finance_expanded():
     try:
-        # 데이터 수집 (지수 및 가격)
-        usd_krw = fdr.DataReader('USD/KRW').iloc[-1]['Close'] # 환율
-        kospi = fdr.DataReader('KS11').iloc[-1]['Close']      # 코스피
-        kosdaq = fdr.DataReader('KQ11').iloc[-1]['Close']     # 코스닥
-        nasdaq = fdr.DataReader('IXIC').iloc[-1]['Close']     # 나스닥
-        sp500 = fdr.DataReader('S&P500').iloc[-1]['Close']    # S&P500
-        btc = fdr.DataReader('BTC/USD').iloc[-1]['Close']     # 비트코인
-        eth = fdr.DataReader('ETH/USD').iloc[-1]['Close']     # 이더리움
-        tsla = fdr.DataReader('TSLA').iloc[-1]['Close']       # 테슬라
+        usd_krw = fdr.DataReader('USD/KRW').iloc[-1]['Close']
+        kospi = fdr.DataReader('KS11').iloc[-1]['Close']
+        kosdaq = fdr.DataReader('KQ11').iloc[-1]['Close']
+        nasdaq = fdr.DataReader('IXIC').iloc[-1]['Close']
+        sp500 = fdr.DataReader('S&P500').iloc[-1]['Close']
+        btc = fdr.DataReader('BTC/USD').iloc[-1]['Close']
+        eth = fdr.DataReader('ETH/USD').iloc[-1]['Close']
+        tsla = fdr.DataReader('TSLA').iloc[-1]['Close']
 
         msg = (
             f"⏰ [종합 금융 지표 보고]\n"
@@ -48,7 +62,7 @@ def report_finance_expanded():
     except Exception as e:
         print(f"지표 수집 오류: {e}")
 
-# 2. 트럼프 뉴스 감시 (실시간)
+# [4. 트럼프 뉴스 감시]
 last_news = ""
 def check_trump():
     global last_news
@@ -65,15 +79,12 @@ def check_trump():
     except: pass
 
 if __name__ == "__main__":
-    # 시작 시 즉시 한 번 보고
     report_finance_expanded()
-    
-    # 2시간마다 금융 지표 보고 스케줄링
     schedule.every(2).hours.do(report_finance_expanded)
     
-    print("🚀 금융 지표 & 트럼프 속보 비서 가동 시작!")
+    print("🚀 모든 비서 가동 시작!")
     
     while True:
         schedule.run_pending()
-        check_trump() # 트럼프 뉴스는 1분마다 실시간 체크
+        check_trump()
         time.sleep(60)
