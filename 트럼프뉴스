@@ -1,0 +1,64 @@
+import requests
+from bs4 import BeautifulSoup
+import time
+from datetime import datetime
+
+# [뉴스 봇 설정]
+NEWS_TOKEN = "8796738664:AAG6CKQO1DMtyPDulQhb7P9tXvrFW5hs9c0"
+CHAT_ID = "7118209547"
+
+# 마지막 뉴스 제목을 저장할 변수
+last_news_title = ""
+
+def send_news(message):
+    url = f"https://api.telegram.org/bot{NEWS_TOKEN}/sendMessage"
+    params = {"chat_id": CHAT_ID, "text": message}
+    try:
+        requests.get(url, params=params)
+    except Exception as e:
+        print(f"❌ 전송 오류: {e}")
+
+def monitor_trump_news(is_first_run=False):
+    global last_news_title
+    
+    url = "https://www.yna.co.kr/search/index?query=%ED%8A%B8%EB%9F%BC%ED%94%84"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    try:
+        res = requests.get(url, headers=headers)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        first_news = soup.select_one('strong.tit')
+        
+        if first_news:
+            current_title = first_news.get_text().strip()
+            
+            # 1. 처음 실행하거나, 2. 새로운 뉴스 제목이 발견되었을 때만 전송
+            if is_first_run or (current_title != last_news_title):
+                last_news_title = current_title
+                
+                tag = "📢 [현재 최신 소식]" if is_first_run else "🚨 [실시간 속보 포착!]"
+                report = (
+                    f"{tag}\n"
+                    "━━━━━━━━━━━━\n"
+                    f"📰 제목: {current_title}\n"
+                    "━━━━━━━━━━━━\n"
+                    f"확인 시간: {datetime.now().strftime('%H:%M:%S')}"
+                )
+                send_news(report)
+                print(f"✅ 메시지 전송 완료: {current_title}")
+            else:
+                print(f"💤 [{datetime.now().strftime('%H:%M:%S')}] 새로운 뉴스 없음 (대기 중)")
+                
+    except Exception as e:
+        print(f"⚠️ 뉴스 수집 오류: {e}")
+
+if __name__ == "__main__":
+    print("📰 트럼프 실시간 뉴스 감시 시스템 시작!")
+    
+    # [처음 실행] 현재 뉴스 하나를 즉시 보냅니다.
+    monitor_trump_news(is_first_run=True)
+    
+    # [무한 반복] 1분마다 새 뉴스가 있는지 확인합니다.
+    while True:
+        time.sleep(60) 
+        monitor_trump_news(is_first_run=False)

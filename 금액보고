@@ -1,0 +1,68 @@
+import FinanceDataReader as fdr
+import requests
+import time
+from datetime import datetime
+
+# [지표 봇 설정]
+TOKEN = "8057933847:AAH6NtEwgsfWO5-Cg785dqDVSSMM2Lgitp8"
+CHAT_ID = "7118209547"
+
+# 감시 기준값
+LIMIT_USD = 1490.0
+
+def send_telegram(message):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    params = {"chat_id": CHAT_ID, "text": message}
+    try:
+        requests.get(url, params=params)
+    except Exception as e:
+        print(f"❌ 전송 오류: {e}")
+
+def get_data_and_report():
+    print(f"\n🔍 [{datetime.now().strftime('%H:%M:%S')}] 금융 지표 수집 중...")
+    try:
+        # 1. 환율 및 시장 지수
+        usd = fdr.DataReader('USD/KRW').iloc[-1]['Close']
+        nasdaq = fdr.DataReader('IXIC').iloc[-1]['Close']
+        
+        # 2. 가상화폐
+        btc = fdr.DataReader('BTC/KRW').iloc[-1]['Close']
+        eth = fdr.DataReader('ETH/KRW').iloc[-1]['Close']
+        
+        # 3. 미국 주식 (테슬라 & TSLL)
+        tsla = fdr.DataReader('TSLA').iloc[-1]['Close']
+        tsll = fdr.DataReader('TSLL').iloc[-1]['Close']
+        
+        # 비상 상황 체크 (환율)
+        if usd >= LIMIT_USD:
+            send_telegram(f"🚨 [긴급] 환율 급등! 현재 {usd:,.2f}원")
+
+        # 메시지 구성
+        report = (
+            f"⏰ [정기 투자 보고]\n"
+            f"보고 시간: {datetime.now().strftime('%H:%M')}\n\n"
+            f"💵 달러/원: {usd:,.2f}원\n"
+            f"📈 나스닥: {nasdaq:,.2f}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🚗 테슬라(TSLA): ${tsla:,.2f}\n"
+            f"⚡ TSLL(레버리지): ${tsll:,.2f}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"₿ 비트코인: {btc:,.0f}원\n"
+            f"💎 이더리움: {eth:,.0f}원\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"※ 2시간마다 업데이트됩니다."
+        )
+        
+        send_telegram(report)
+        print(f"✅ 지표 보고 완료 (TSLA/TSLL 포함)")
+        
+    except Exception as e:
+        print(f"⚠️ 데이터 수집 오류: {e}")
+
+if __name__ == "__main__":
+    print("🚀 지표 감시 시스템 가동 중... (TSLA/TSLL 추가됨)")
+    get_data_and_report() # 실행 즉시 보고
+    
+    while True:
+        time.sleep(7200) # 2시간 대기
+        get_data_and_report()
