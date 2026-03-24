@@ -29,11 +29,9 @@ def send_tg(msg):
         requests.get(url, params={"chat_id": CHAT_ID, "text": msg}, timeout=15)
     except: pass
 
-# [3. 종합 금융 보고서 전용 함수 (이것만 실행됨)]
+# [3. 종합 금융 보고서 전용 함수]
 def report_all_in_one():
-    print("📊 종합 보고서 수집 시작...")
     try:
-        # 하나라도 실패하면 에러 메시지를 띄우도록 함
         usd = fdr.DataReader('USD/KRW').iloc[-1]['Close']
         ks = fdr.DataReader('KS11').iloc[-1]['Close']
         kd = fdr.DataReader('KQ11').iloc[-1]['Close']
@@ -44,7 +42,7 @@ def report_all_in_one():
         tsla = fdr.DataReader('TSLA').iloc[-1]['Close']
 
         report = (
-            f"✅ [통합 금융 지표 브리핑]\n"
+            f"✅ [정기 금융 지표 브리핑]\n"
             f"━━━━━━━━━━━━\n"
             f"💵 환율: {usd:,.2f}원\n\n"
             f"🇰🇷 국내: 코스피 {ks:,.2f} / 코스닥 {kd:,.2f}\n"
@@ -54,9 +52,7 @@ def report_all_in_one():
             f"━━━━━━━━━━━━"
         )
         send_tg(report)
-        print("✅ 보고서 발송 완료")
-    except Exception as e:
-        send_tg(f"⚠️ 지표 수집 중 오류 발생: {e}")
+    except: pass
 
 # [4. 트럼프 뉴스]
 last_news = ""
@@ -73,13 +69,14 @@ def check_trump():
     except: pass
 
 if __name__ == "__main__":
-    # 시작하자마자 종합 보고서 한 번 쏘기!
-    report_all_in_one()
+    # ⚠️ 중요: '즉시 실행' 코드를 삭제했습니다. 이제 서버가 켜져도 바로 메시지를 안 쏩니다.
     
-    # 2시간마다 종합 보고서
+    # 2시간마다 정기 보고 예약
     schedule.every(2).hours.do(report_all_in_one)
+    
+    print("🚀 비서가 조용히 대기 중입니다... (2시간 뒤 첫 보고)")
     
     while True:
         schedule.run_pending()
-        check_trump()
+        check_trump() # 트럼프 뉴스는 계속 감시합니다.
         time.sleep(60)
