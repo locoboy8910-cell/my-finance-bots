@@ -10,28 +10,29 @@ import os
 
 # [1. Render 포트 체크 통과를 위한 가짜 서버]
 def run_dummy_server():
-    port = int(os.environ.get("PORT", 80))
+    port = int(os.environ.get("PORT", 10000))
     handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", port), handler) as httpd:
-        print(f"✅ 가짜 서버가 {port}번 포트에서 작동 중입니다.")
-        httpd.serve_forever()
+    try:
+        with socketserver.TCPServer(("0.0.0.0", port), handler) as httpd:
+            httpd.serve_forever()
+    except: pass
 
-# 배경에서 가짜 서버 실행
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # [2. 설정]
 CHAT_ID = "7118209547"
 TOKEN_FINANCE = "8057933847:AAH6NtEwgsfWO5-Cg785dqDVSSMM2Lgitp8"
 
-def send_tg(token, msg):
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+def send_tg(msg):
+    url = f"https://api.telegram.org/bot{TOKEN_FINANCE}/sendMessage"
     try:
         requests.get(url, params={"chat_id": CHAT_ID, "text": msg}, timeout=10)
     except: pass
 
-# [3. 종합 금융 지표 보고]
-def report_finance_expanded():
+# [3. 종합 금융 지표 보고 (2시간마다)]
+def report_all_finance():
     try:
+        # 데이터 수집
         usd_krw = fdr.DataReader('USD/KRW').iloc[-1]['Close']
         kospi = fdr.DataReader('KS11').iloc[-1]['Close']
         kosdaq = fdr.DataReader('KQ11').iloc[-1]['Close']
@@ -42,7 +43,7 @@ def report_finance_expanded():
         tsla = fdr.DataReader('TSLA').iloc[-1]['Close']
 
         msg = (
-            f"⏰ [종합 금융 지표 보고]\n"
+            f"⏰ [종합 금융 보고서]\n"
             f"━━━━━━━━━━━━\n"
             f"💵 환율: {usd_krw:,.2f}원\n\n"
             f"🇰🇷 국내 증시\n"
@@ -58,9 +59,9 @@ def report_finance_expanded():
             f"- 테슬라: ${tsla:,.2f}\n"
             f"━━━━━━━━━━━━"
         )
-        send_tg(TOKEN_FINANCE, msg)
+        send_tg(msg)
     except Exception as e:
-        print(f"지표 수집 오류: {e}")
+        print(f"데이터 수집 중 오류: {e}")
 
 # [4. 트럼프 뉴스 감시]
 last_news = ""
@@ -74,15 +75,16 @@ def check_trump():
         if news_item:
             title = news_item.text
             if title != last_news:
-                send_tg(TOKEN_FINANCE, f"🚨 [트럼프 속보]\n{title}")
+                send_tg(f"🚨 [트럼프 속보]\n{title}")
                 last_news = title
     except: pass
 
 if __name__ == "__main__":
-    report_finance_expanded()
-    schedule.every(2).hours.do(report_finance_expanded)
+    # 시작 시 즉시 종합 보고 실행
+    report_all_finance()
     
-    print("🚀 모든 비서 가동 시작!")
+    # 스케줄: 2시간마다 종합 보고
+    schedule.every(2).hours.do(report_all_finance)
     
     while True:
         schedule.run_pending()
